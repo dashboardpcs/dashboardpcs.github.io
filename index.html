@@ -96,54 +96,121 @@
           </div>
         </div>
 
-        <div class="row g-4 mb-4" id="kpiSection">
-          <div class="col-6 col-md-4 col-xl-2">
+        <div class="row g-4 mb-3" id="kpiSectionToday">
+          <div class="col-12"><h4 class="kpi-group-title"><i class="bi bi-calendar-check me-2"></i>Aktivitas Hari Ini</h4></div>
+          
+          <div class="col-12 col-md-4">
             <div class="glass-card kpi-card accent-cyan">
-              <div class="kpi-icon"><i class="bi bi-exclamation-diamond-fill"></i></div>
-              <p>Total Kendala Hari Ini</p>
-              <h3 id="kpiTotalToday">0</h3>
+              <div class="kpi-main-info">
+                <div class="kpi-icon"><i class="bi bi-exclamation-diamond-fill"></i></div>
+                <div>
+                  <p>Total Kendala Hari Ini</p>
+                  <h3 id="kpiTodayTotal">0</h3>
+                </div>
+              </div>
+              <div class="kpi-sub-breakdown">
+                <div class="sub-item"><span>SM</span><strong id="kpiTodayTotalSM">0</strong></div>
+                <div class="sub-item"><span>CM</span><strong id="kpiTodayTotalCM">0</strong></div>
+                <div class="sub-item"><span>FU</span><strong id="kpiTodayTotalFU">0</strong></div>
+              </div>
             </div>
           </div>
-          <div class="col-6 col-md-4 col-xl-2">
-            <div class="glass-card kpi-card accent-warning">
-              <div class="kpi-icon"><i class="bi bi-hourglass-split"></i></div>
-              <p>Pending</p>
-              <h3 id="kpiPending">0</h3>
-            </div>
-          </div>
-          <div class="col-6 col-md-4 col-xl-2">
+
+          <div class="col-12 col-md-4">
             <div class="glass-card kpi-card accent-primary">
-              <div class="kpi-icon"><i class="bi bi-arrow-repeat"></i></div>
-              <p>On Progress</p>
-              <h3 id="kpiProgress">0</h3>
+              <div class="kpi-main-info">
+                <div class="kpi-icon"><i class="bi bi-arrow-repeat"></i></div>
+                <div>
+                  <p>On Progress Hari Ini</p>
+                  <h3 id="kpiTodayProgress">0</h3>
+                </div>
+              </div>
+              <div class="kpi-sub-breakdown">
+                <div class="sub-item"><span>SM</span><strong id="kpiTodayProgressSM">0</strong></div>
+                <div class="sub-item"><span>CM</span><strong id="kpiTodayProgressCM">0</strong></div>
+                <div class="sub-item"><span>FU</span><strong id="kpiTodayProgressFU">0</strong></div>
+              </div>
             </div>
           </div>
-          <div class="col-6 col-md-4 col-xl-2">
-            <div class="glass-card kpi-card accent-success">
-              <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
-              <p>Done</p>
-              <h3 id="kpiDone">0</h3>
+
+          <div class="col-12 col-md-4">
+            <div class="glass-card kpi-card accent-warning">
+              <div class="kpi-main-info">
+                <div class="kpi-icon"><i class="bi bi-hourglass-split"></i></div>
+                <div>
+                  <p>Pending Hari Ini</p>
+                  <h3 id="kpiTodayPending">0</h3>
+                </div>
+              </div>
+              <div class="kpi-sub-breakdown">
+                <div class="sub-item"><span>SM</span><strong id="kpiTodayPendingSM">0</strong></div>
+                <div class="sub-item"><span>CM</span><strong id="kpiTodayPendingCM">0</strong></div>
+                <div class="sub-item"><span>FU</span><strong id="kpiTodayPendingFU">0</strong></div>
+              </div>
             </div>
           </div>
-          <div class="col-6 col-md-4 col-xl-2">
+        </div>
+
+        <div class="row g-4 mb-4" id="kpiSectionTotal">
+          <div class="col-12"><h4 class="kpi-group-title"><i class="bi bi-pie-chart-fill me-2"></i>Statistik Akumulatif</h4></div>
+
+          <div class="col-12 col-sm-6 col-xl-3">
+            <div class="glass-card kpi-card accent-dark-blue">
+              <div class="kpi-main-info">
+                <div class="kpi-icon"><i class="bi bi-folder-fill"></i></div>
+                <div>
+                  <p>Total Kendala</p>
+                  <h3 id="kpiAllTotal">0</h3>
+                </div>
+              </div>
+              <div class="kpi-sub-breakdown">
+                <div class="sub-item"><span>SM</span><strong id="kpiAllTotalSM">0</strong></div>
+                <div class="sub-item"><span>CM</span><strong id="kpiAllTotalCM">0</strong></div>
+                <div class="sub-item"><span>FU</span><strong id="kpiAllTotalFU">0</strong></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-xl-3">
             <div class="glass-card kpi-card accent-indigo">
-              <div class="kpi-icon"><i class="bi bi-person-workspace"></i></div>
-              <p>Total SM</p>
-              <h3 id="kpiSM">0</h3>
+              <div class="kpi-icon-small text-primary"><i class="bi bi-arrow-repeat"></i></div>
+              <p class="mb-1 text-muted" style="font-size: 0.85rem;">On Progress Total</p>
+              <h3 id="kpiAllProgress" style="font-size: 1.8rem; font-weight: 800; margin: 0;">0</h3>
+              <div class="kpi-sub-breakdown mt-2">
+                <div class="sub-item"><span>SM</span><strong id="kpiAllProgressSM">0</strong></div>
+                <div class="sub-item"><span>CM</span><strong id="kpiAllProgressCM">0</strong></div>
+                <div class="sub-item"><span>FU</span><strong id="kpiAllProgressFU">0</strong></div>
+              </div>
             </div>
           </div>
-          <div class="col-6 col-md-4 col-xl-2">
+
+          <div class="col-12 col-sm-6 col-xl-3">
             <div class="glass-card kpi-card accent-rose">
-              <div class="kpi-icon"><i class="bi bi-diagram-3-fill"></i></div>
-              <p>Total CM</p>
-              <h3 id="kpiCM">0</h3>
+              <div class="kpi-icon-small text-warning"><i class="bi bi-hourglass-split"></i></div>
+              <p class="mb-1 text-muted" style="font-size: 0.85rem;">Pending Total</p>
+              <h3 id="kpiAllPending" style="font-size: 1.8rem; font-weight: 800; margin: 0;">0</h3>
+              <div class="kpi-sub-breakdown mt-2">
+                <div class="sub-item"><span>SM</span><strong id="kpiAllPendingSM">0</strong></div>
+                <div class="sub-item"><span>CM</span><strong id="kpiAllPendingCM">0</strong></div>
+                <div class="sub-item"><span>FU</span><strong id="kpiAllPendingFU">0</strong></div>
+              </div>
             </div>
           </div>
-          <div class="col-6 col-md-4 col-xl-2">
-            <div class="glass-card kpi-card accent-teal">
-              <div class="kpi-icon"><i class="bi bi-telephone-forward-fill"></i></div>
-              <p>Total FU</p>
-              <h3 id="kpiFU">0</h3>
+
+          <div class="col-12 col-sm-6 col-xl-3">
+            <div class="glass-card kpi-card accent-success">
+              <div class="kpi-main-info">
+                <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
+                <div>
+                  <p>Done Total</p>
+                  <h3 id="kpiAllDone">0</h3>
+                </div>
+              </div>
+              <div class="kpi-sub-breakdown">
+                <div class="sub-item"><span>SM</span><strong id="kpiAllDoneSM">0</strong></div>
+                <div class="sub-item"><span>CM</span><strong id="kpiAllDoneCM">0</strong></div>
+                <div class="sub-item"><span>FU</span><strong id="kpiAllDoneFU">0</strong></div>
+              </div>
             </div>
           </div>
         </div>
@@ -308,6 +375,7 @@
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

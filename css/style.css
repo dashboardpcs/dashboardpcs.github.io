@@ -41,6 +41,10 @@ body {
   min-height: 100vh;
 }
 
+body, .sidebar, .glass-card, .form-control, .form-select, .sidebar-link {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
 a {
   text-decoration: none;
 }
@@ -154,6 +158,7 @@ html[data-bs-theme="light"] .sidebar {
 .main-content {
   flex: 1;
   padding: 1.5rem;
+  width: calc(100% - 280px);
 }
 
 .topbar {
@@ -255,6 +260,7 @@ div.dataTables_wrapper div.dt-buttons .btn {
   font-size: 1.05rem;
 }
 
+/* --- Modifikasi KPI Card Layout Master-Detail --- */
 .kpi-card {
   height: 100%;
   position: relative;
@@ -269,19 +275,84 @@ div.dataTables_wrapper div.dt-buttons .btn {
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  pointer-events: none;
 }
 
-.kpi-card p {
-  margin: 0.8rem 0 0.35rem;
+.kpi-group-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--muted);
-  font-size: 0.88rem;
+  margin-bottom: -0.25rem;
 }
 
-.kpi-card h3 {
+.kpi-main-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.kpi-main-info p {
   margin: 0;
-  font-size: 2rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.kpi-main-info h3 {
+  margin: 0;
+  font-size: 1.8rem;
   font-weight: 800;
+}
+
+.kpi-icon-small {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.kpi-sub-breakdown {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--surface-border);
+  gap: 0.5rem;
+}
+
+.sub-item {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.35rem 0.25rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+html[data-bs-theme="light"] .sub-item {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.sub-item span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.sub-item strong {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text);
 }
 
 .kpi-icon {
@@ -300,7 +371,8 @@ div.dataTables_wrapper div.dt-buttons .btn {
 .accent-success .kpi-icon { background: linear-gradient(135deg, #16a34a, #22c55e); }
 .accent-indigo .kpi-icon { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
 .accent-rose .kpi-icon { background: linear-gradient(135deg, #ec4899, #f43f5e); }
-.accent-teal .kpi-icon { background: linear-gradient(135deg, #0f766e, #14b8a6); }
+.accent-dark-blue .kpi-icon { background: linear-gradient(135deg, #1e293b, #475569); }
+.accent-dark-blue::after { background: rgba(71, 85, 105, 0.08); }
 
 .section-header {
   display: flex;
@@ -368,21 +440,53 @@ table.dataTable thead th {
   --bs-border-color: var(--surface-border);
 }
 
+/* Memastikan sel tabel memberikan ruang vertikal yang cukup */
+.table-card .table tbody td {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+  vertical-align: middle;     /* Semua data di dalam tabel otomatis rapi di tengah */
+}
+
 .table-card .table thead th {
   border-bottom-width: 1px;
   white-space: nowrap;
 }
 
 .badge-soft {
-  padding: 0.45rem 0.7rem;
+  display: inline-flex;       /* Menggunakan flex agar posisi teks simetris di tengah */
+  align-items: center;        /* Vertikal center */
+  justify-content: center;    /* Horizontal center */
+  padding: 0.35rem 0.75rem;   /* Sedikit dikurangi agar tidak menabrak batas atas/bawah sel */
   border-radius: 999px;
   font-weight: 700;
   font-size: 0.75rem;
+  line-height: 1.2;           /* Mengunci tinggi baris teks agar tidak melar */
+  text-align: center;
+  white-space: nowrap;
+  min-width: 100px;           /* Lebar minimal yang pas untuk "On Progress" */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
-.badge-soft.pending { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
-.badge-soft.progress { background: rgba(59, 130, 246, 0.16); color: #60a5fa; }
-.badge-soft.done { background: rgba(34, 197, 94, 0.16); color: #4ade80; }
+.badge-soft.pending { background-color: #fef3c7; 
+  color: #d97706; }
+.badge-soft.progress { background-color: #dbeafe; 
+  color: #1d4ed8; /* Biru tegas, sangat kontras di Light Mode */ }
+.badge-soft.done { background-color: #dcfce7; 
+  color: #15803d; }
+
+  /* Optimalisasi Kontras Warna Khusus Tema Dark Mode */
+html[data-bs-theme="dark"] .badge-soft.pending { 
+  background-color: rgba(245, 158, 11, 0.16); 
+  color: #fbbf24; 
+}
+html[data-bs-theme="dark"] .badge-soft.progress { 
+  background-color: rgba(59, 130, 246, 0.2); 
+  color: #60a5fa; 
+}
+html[data-bs-theme="dark"] .badge-soft.done { 
+  background-color: rgba(34, 197, 94, 0.16); 
+  color: #4ade80; 
+}
 
 .process-pill {
   display: inline-flex;
@@ -437,6 +541,35 @@ div.dataTables_wrapper div.dt-buttons .btn {
 .page-item.active .page-link {
   background: linear-gradient(135deg, #38bdf8, #6366f1);
   border-color: transparent;
+}
+
+/* Memperbaiki kontras teks tabel DataTables pada tema Light */
+html[data-bs-theme="light"] .dataTables_wrapper .dataTables_length,
+html[data-bs-theme="light"] .dataTables_wrapper .dataTables_filter,
+html[data-bs-theme="light"] .dataTables_wrapper .dataTables_info,
+html[data-bs-theme="light"] .dataTables_wrapper .dataTables_paginate .page-link {
+  color: #0f172a !important;
+}
+
+html[data-bs-theme="light"] .page-link {
+  background-color: #ffffff;
+  border-color: #dbe8ff;
+}
+
+/* Kustomisasi Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
 }
 
 @media (max-width: 991.98px) {

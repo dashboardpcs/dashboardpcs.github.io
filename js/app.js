@@ -34,12 +34,20 @@ const DashboardApp = (() => {
       'loadingOverlay', 'errorAlert', 'lastUpdateLabel', 'lastUpdateFull', 'recordCountLabel',
       'refreshButton', 'themeToggle', 'sidebarToggle', 'sidebar', 'startDate', 'endDate',
       'leaderFilter', 'statusFilter', 'processFilter', 'merchantSearch', 'resetFilters',
-      'kpiTotalToday', 'kpiPending', 'kpiProgress', 'kpiDone', 'kpiSM', 'kpiCM', 'kpiFU'
+      
+      // Hari Ini IDs
+      'kpiTodayTotal', 'kpiTodayTotalSM', 'kpiTodayTotalCM', 'kpiTodayTotalFU',
+      'kpiTodayProgress', 'kpiTodayProgressSM', 'kpiTodayProgressCM', 'kpiTodayProgressFU',
+      'kpiTodayPending', 'kpiTodayPendingSM', 'kpiTodayPendingCM', 'kpiTodayPendingFU',
+      
+      // Akumulatif Total IDs
+      'kpiAllTotal', 'kpiAllTotalSM', 'kpiAllTotalCM', 'kpiAllTotalFU',
+      'kpiAllProgress', 'kpiAllProgressSM', 'kpiAllProgressCM', 'kpiAllProgressFU',
+      'kpiAllPending', 'kpiAllPendingSM', 'kpiAllPendingCM', 'kpiAllPendingFU',
+      'kpiAllDone', 'kpiAllDoneSM', 'kpiAllDoneCM', 'kpiAllDoneFU'
     ];
 
-    ids.forEach((id) => {
-      elements[id] = document.getElementById(id);
-    });
+    ids.forEach((id) => { elements[id] = document.getElementById(id); });
   };
 
   const bindEvents = () => {
@@ -51,7 +59,7 @@ const DashboardApp = (() => {
       elements[key].addEventListener('change', handleFilterChange);
     });
 
-    elements.merchantSearch.addEventListener('input', handleFilterChange);
+    elements.merchantSearch.addEventListener('input', debounce(handleFilterChange, 300));
     elements.resetFilters.addEventListener('click', resetFilters);
 
     document.querySelectorAll('.sidebar-link').forEach((link) => {
@@ -63,6 +71,14 @@ const DashboardApp = (() => {
     });
   };
 
+  const debounce = (func, delay) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+  };
+
   const toggleTheme = () => {
     const html = document.documentElement;
     const current = html.getAttribute('data-bs-theme') || 'light';
@@ -70,7 +86,21 @@ const DashboardApp = (() => {
     html.setAttribute('data-bs-theme', next);
     localStorage.setItem('dashboard-theme', next);
     updateThemeIcon(next);
-    refreshCharts();
+    
+    const palette = getChartPalette();
+    Object.keys(state.charts).forEach(chartId => {
+      const chart = state.charts[chartId];
+      if(chart.options.scales) {
+        chart.options.scales.x.ticks.color = palette.text;
+        chart.options.scales.x.grid.color = palette.grid;
+        chart.options.scales.y.ticks.color = palette.text;
+        chart.options.scales.y.grid.color = palette.grid;
+      }
+      if(chart.options.plugins && chart.options.plugins.legend) {
+        chart.options.plugins.legend.labels.color = palette.text;
+      }
+      chart.update();
+    });
   };
 
   const applySavedTheme = () => {
@@ -91,139 +121,94 @@ const DashboardApp = (() => {
 
     try {
       const response = await fetch(CSV_URL, { cache: 'no-store' });
-
-      if (!response.ok) {
-        throw new Error(`Gagal mengambil data. HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const csvText = await response.text();
-      const parsed = parseCsv(csvText).map(mapRow).filter((item) => item && item.dateObj instanceof Date && !Number.isNaN(item.dateObj.getTime()));
+      
+      Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const parsed = results.data.map(mapRow).filter((item) => item && item.dateObj instanceof Date && !Number.isNaN(item.dateObj.getTime()));
+          
+          state.rawData = parsed.sort((a, b) => b.dateObj - a.dateObj);
+          state.lastUpdated = new Date();
 
-      state.rawData = parsed.sort((a, b) => b.dateObj - a.dateObj);
-      state.lastUpdated = new Date();
+          populateLeaderFilter();
+          applyFilters();
+          updateLastUpdated();
+          setLoading(false);
+        },
+        error: (err) => { throw new Error(err.message); }
+      });
 
-      populateLeaderFilter();
-      applyFilters();
-      updateLastUpdated();
     } catch (error) {
       console.error(error);
-      showError(`Tidak dapat mengakses Google Sheet saat ini. ${error.message}. Silakan coba beberapa saat lagi.`);
+      showError(`Gagal sinkronisasi data Google Sheets: ${error.message}.`);
       state.rawData = [];
       applyFilters();
-    } finally {
       setLoading(false);
     }
-  };
-
-  const parseCsv = (csvText) => {
-    const rows = [];
-    let current = '';
-    let row = [];
-    let inQuotes = false;
-
-    for (let i = 0; i < csvText.length; i += 1) {
-      const char = csvText[i];
-      const next = csvText[i + 1];
-
-      if (char === '"') {
-        if (inQuotes && next === '"') {
-          current += '"';
-          i += 1;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === ',' && !inQuotes) {
-        row.push(current);
-        current = '';
-      } else if ((char === '\n' || char === '\r') && !inQuotes) {
-        if (char === '\r' && next === '\n') i += 1;
-        row.push(current);
-        if (row.some((cell) => cell.trim() !== '')) rows.push(row);
-        row = [];
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-
-    if (current.length > 0 || row.length > 0) {
-      row.push(current);
-      rows.push(row);
-    }
-
-    const [headers, ...dataRows] = rows;
-    return dataRows.map((dataRow) => Object.fromEntries(headers.map((header, index) => [header.trim(), (dataRow[index] || '').trim()])));
   };
 
   const mapRow = (row) => {
     const rawDate = row['Tanggal'] || '';
     const dateObj = parseIndonesianDate(rawDate);
-    const leader = normalizeEmpty(row['Leader']);
-    const merchant = normalizeEmpty(row['Nama Merchant']);
-    const status = normalizeStatus(row['Status tiket']);
-
     return {
       tanggal: rawDate,
       dateObj,
       dateKey: formatDateKey(dateObj),
       dateTimestamp: dateObj ? dateObj.getTime() : 0,
-      tid: normalizeEmpty(row.TID),
-      merchant,
-      leader,
-      kendala: normalizeEmpty(row.Kendala),
-      sm: parseBooleanCell(row.SM),
-      cm: parseBooleanCell(row.CM),
-      fu: parseBooleanCell(row.FU),
-      status,
-      note: normalizeEmpty(row.Note),
-      pelapor: normalizeEmpty(row.Pelapor)
+      tid: normalizeEmpty(row['TID']),
+      merchant: normalizeEmpty(row['Nama Merchant']),
+      leader: normalizeEmpty(row['Leader']),
+      kendala: normalizeEmpty(row['Kendala']),
+      sm: parseBooleanCell(row['SM']),
+      cm: parseBooleanCell(row['CM']),
+      fu: parseBooleanCell(row['FU']),
+      status: normalizeStatus(row['Status tiket']),
+      note: normalizeEmpty(row['Note'])
     };
   };
 
-  const normalizeEmpty = (value) => {
-    const cleaned = String(value || '').trim();
-    return cleaned || 'Tidak ditemukan';
-  };
-
+  const normalizeEmpty = (value) => String(value || '').trim() || 'Tidak ditemukan';
+  const parseBooleanCell = (value) => String(value || '').trim().toUpperCase() === 'TRUE';
+  
   const normalizeStatus = (value) => {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'pending') return 'Pending';
-    if (normalized === 'on progress') return 'On Progress';
-    if (normalized === 'done') return 'Done';
+    if (normalized === 'on progress' || normalized === 'progress') return 'On Progress';
+    if (normalized === 'done' || normalized === 'success') return 'Done';
     return 'Pending';
   };
 
-  const parseBooleanCell = (value) => String(value || '').trim().toUpperCase() === 'TRUE';
-
   const parseIndonesianDate = (value) => {
     if (!value) return null;
-    const [datePart, timePart = '00:00'] = value.split(' ');
-    const [day, month, year] = datePart.split('/').map(Number);
+    const parts = value.split(' ');
+    const datePart = parts[0];
+    const timePart = parts[1] || '00:00';
+    
+    let day, month, year;
+    if (datePart.includes('/')) {
+      [day, month, year] = datePart.split('/').map(Number);
+    } else {
+      [year, month, day] = datePart.split('-').map(Number);
+    }
     const [hour = 0, minute = 0] = timePart.split(':').map(Number);
     return new Date(year, month - 1, day, hour, minute);
   };
 
   const formatDateKey = (date) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
 
   const formatDateTimeId = (date) => new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
+    day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
   }).format(date);
 
   const formatDateId = (date) => new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
+    day: '2-digit', month: 'short', year: 'numeric'
   }).format(date);
 
   const handleFilterChange = () => {
@@ -235,7 +220,6 @@ const DashboardApp = (() => {
       process: elements.processFilter.value,
       merchant: elements.merchantSearch.value.trim().toLowerCase()
     };
-
     applyFilters();
   };
 
@@ -283,160 +267,145 @@ const DashboardApp = (() => {
       option.textContent = leader;
       elements.leaderFilter.appendChild(option);
     });
-
     elements.leaderFilter.value = leaders.includes(current) ? current : '';
   };
 
   const updateKpis = () => {
     const data = state.filteredData;
     const todayKey = formatDateKey(new Date());
-    const totalToday = data.filter((item) => item.dateKey === todayKey).length;
 
-    elements.kpiTotalToday.textContent = totalToday;
-    elements.kpiPending.textContent = data.filter((item) => item.status === 'Pending').length;
-    elements.kpiProgress.textContent = data.filter((item) => item.status === 'On Progress').length;
-    elements.kpiDone.textContent = data.filter((item) => item.status === 'Done').length;
-    elements.kpiSM.textContent = data.filter((item) => item.sm).length;
-    elements.kpiCM.textContent = data.filter((item) => item.cm).length;
-    elements.kpiFU.textContent = data.filter((item) => item.fu).length;
+    const dataToday = data.filter(item => item.dateKey === todayKey);
+    const dataTodayProgress = dataToday.filter(item => item.status === 'On Progress');
+    const dataTodayPending = dataToday.filter(item => item.status === 'Pending');
+
+    const dataAllProgress = data.filter(item => item.status === 'On Progress');
+    const dataAllPending = data.filter(item => item.status === 'Pending');
+    const dataAllDone = data.filter(item => item.status === 'Done');
+
+    // --- RENDER HARI INI ---
+    elements.kpiTodayTotal.textContent = dataToday.length;
+    elements.kpiTodayTotalSM.textContent = dataToday.filter(item => item.sm).length;
+    elements.kpiTodayTotalCM.textContent = dataToday.filter(item => item.cm).length;
+    elements.kpiTodayTotalFU.textContent = dataToday.filter(item => item.fu).length;
+
+    elements.kpiTodayProgress.textContent = dataTodayProgress.length;
+    elements.kpiTodayProgressSM.textContent = dataTodayProgress.filter(item => item.sm).length;
+    elements.kpiTodayProgressCM.textContent = dataTodayProgress.filter(item => item.cm).length;
+    elements.kpiTodayProgressFU.textContent = dataTodayProgress.filter(item => item.fu).length;
+
+    elements.kpiTodayPending.textContent = dataTodayPending.length;
+    elements.kpiTodayPendingSM.textContent = dataTodayPending.filter(item => item.sm).length;
+    elements.kpiTodayPendingCM.textContent = dataTodayPending.filter(item => item.cm).length;
+    elements.kpiTodayPendingFU.textContent = dataTodayPending.filter(item => item.fu).length;
+
+    // --- RENDER AKUMULATIF ---
+    elements.kpiAllTotal.textContent = data.length;
+    elements.kpiAllTotalSM.textContent = data.filter(item => item.sm).length;
+    elements.kpiAllTotalCM.textContent = data.filter(item => item.cm).length;
+    elements.kpiAllTotalFU.textContent = data.filter(item => item.fu).length;
+
+    elements.kpiAllProgress.textContent = dataAllProgress.length;
+    elements.kpiAllProgressSM.textContent = dataAllProgress.filter(item => item.sm).length;
+    elements.kpiAllProgressCM.textContent = dataAllProgress.filter(item => item.cm).length;
+    elements.kpiAllProgressFU.textContent = dataAllProgress.filter(item => item.fu).length;
+
+    elements.kpiAllPending.textContent = dataAllPending.length;
+    elements.kpiAllPendingSM.textContent = dataAllPending.filter(item => item.sm).length;
+    elements.kpiAllPendingCM.textContent = dataAllPending.filter(item => item.cm).length;
+    elements.kpiAllPendingFU.textContent = dataAllPending.filter(item => item.fu).length;
+
+    elements.kpiAllDone.textContent = dataAllDone.length;
+    elements.kpiAllDoneSM.textContent = dataAllDone.filter(item => item.sm).length;
+    elements.kpiAllDoneCM.textContent = dataAllDone.filter(item => item.cm).length;
+    elements.kpiAllDoneFU.textContent = dataAllDone.filter(item => item.fu).length;
   };
 
   const renderCharts = () => {
     const palette = getChartPalette();
-    renderTrendChart(palette);
-    renderLeaderChart(palette);
-    renderKendalaChart(palette);
-    renderStatusChart(palette);
+    
+    // Trend Chart
+    const trendGroup = groupBy(state.filteredData, (item) => item.dateKey);
+    const sortedTrend = [...trendGroup.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    const trendLabels = sortedTrend.map(([key]) => formatDateId(new Date(`${key}T00:00:00`)));
+    const trendValues = sortedTrend.map(([, items]) => items.length);
+    
+    updateOrCreateChart('trendChart', 'line', trendLabels, [{
+      label: 'Jumlah Kendala',
+      data: trendValues,
+      borderColor: '#38bdf8',
+      backgroundColor: 'rgba(56, 189, 248, 0.15)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3
+    }], { scales: baseScales(palette), plugins: basePlugins(palette) });
+
+    // Leader Chart
+    const topLeader = getTopCounts(state.filteredData, 'leader', 10);
+    updateOrCreateChart('leaderChart', 'bar', topLeader.labels, [{
+      label: 'Jumlah Kendala',
+      data: topLeader.values,
+      backgroundColor: palette.series
+    }], { indexAxis: 'y', scales: baseScales(palette), plugins: basePlugins(palette) });
+
+    // Kendala Chart
+    const topKendala = getTopCounts(state.filteredData, 'kendala', 10);
+    updateOrCreateChart('kendalaChart', 'doughnut', topKendala.labels, [{
+      data: topKendala.values,
+      backgroundColor: palette.series,
+      borderColor: palette.background,
+      borderWidth: 2
+    }], { plugins: basePlugins(palette) });
+
+    // Status Chart
+    const statusCounts = ['Pending', 'On Progress', 'Done'].map((st) => state.filteredData.filter((item) => item.status === st).length);
+    updateOrCreateChart('statusChart', 'pie', ['Pending', 'On Progress', 'Done'], [{
+      data: statusCounts,
+      backgroundColor: ['#f59e0b', '#3b82f6', '#22c55e'],
+      borderColor: palette.background,
+      borderWidth: 2
+    }], { plugins: basePlugins(palette) });
   };
 
-  const refreshCharts = () => {
-    if (state.filteredData.length || state.rawData.length) {
-      renderCharts();
-    }
-  };
-
-  const renderTrendChart = (palette) => {
-    const grouped = groupBy(state.filteredData, (item) => item.dateKey);
-    const sortedEntries = [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-    const labels = sortedEntries.map(([key]) => formatDateId(new Date(`${key}T00:00:00`)));
-    const values = sortedEntries.map(([, items]) => items.length);
-
-    createOrUpdateChart('trendChart', 'line', {
-      labels,
-      datasets: [{
-        label: 'Jumlah Kendala',
-        data: values,
-        borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.18)',
-        fill: true,
-        tension: 0.35,
-        pointRadius: 4,
-        pointHoverRadius: 6
-      }]
-    }, {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: basePlugins(palette),
-      scales: baseScales(palette)
-    });
-  };
-
-  const renderLeaderChart = (palette) => {
-    const top = getTopCounts(state.filteredData, 'leader', 10);
-    createOrUpdateChart('leaderChart', 'bar', {
-      labels: top.labels,
-      datasets: [{
-        label: 'Jumlah Kendala',
-        data: top.values,
-        backgroundColor: top.values.map((_, index) => palette.series[index % palette.series.length])
-      }]
-    }, {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: basePlugins(palette),
-      scales: baseScales(palette)
-    });
-  };
-
-  const renderKendalaChart = (palette) => {
-    const top = getTopCounts(state.filteredData, 'kendala', 10);
-    createOrUpdateChart('kendalaChart', 'doughnut', {
-      labels: top.labels,
-      datasets: [{
-        data: top.values,
-        backgroundColor: top.values.map((_, index) => palette.series[index % palette.series.length]),
-        borderColor: palette.background,
-        borderWidth: 2
-      }]
-    }, {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: basePlugins(palette)
-    });
-  };
-
-  const renderStatusChart = (palette) => {
-    const counts = ['Pending', 'On Progress', 'Done'].map((status) => state.filteredData.filter((item) => item.status === status).length);
-    createOrUpdateChart('statusChart', 'pie', {
-      labels: ['Pending', 'On Progress', 'Done'],
-      datasets: [{
-        data: counts,
-        backgroundColor: ['#f59e0b', '#3b82f6', '#22c55e'],
-        borderColor: palette.background,
-        borderWidth: 2
-      }]
-    }, {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: basePlugins(palette)
-    });
-  };
-
-  const createOrUpdateChart = (canvasId, type, data, options) => {
+  const updateOrCreateChart = (canvasId, type, labels, datasets, extraOptions = {}) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
     if (state.charts[canvasId]) {
-      state.charts[canvasId].destroy();
+      const chart = state.charts[canvasId];
+      chart.data.labels = labels;
+      chart.data.datasets = datasets;
+      chart.update('active');
+    } else {
+      state.charts[canvasId] = new Chart(canvas, {
+        type,
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          ...extraOptions
+        }
+      });
     }
-
-    state.charts[canvasId] = new Chart(canvas, { type, data, options });
   };
 
   const getChartPalette = () => {
     const theme = document.documentElement.getAttribute('data-bs-theme');
     return {
       text: theme === 'dark' ? '#e2e8f0' : '#0f172a',
-      grid: theme === 'dark' ? 'rgba(148, 163, 184, 0.14)' : 'rgba(148, 163, 184, 0.24)',
-      background: theme === 'dark' ? '#0f172a' : '#ffffff',
+      grid: theme === 'dark' ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.15)',
+      background: theme === 'dark' ? '#121c31' : '#ffffff',
       series: ['#38bdf8', '#6366f1', '#14b8a6', '#ec4899', '#f59e0b', '#22c55e', '#8b5cf6', '#ef4444', '#0ea5e9', '#eab308']
     };
   };
 
   const basePlugins = (palette) => ({
-    legend: {
-      labels: {
-        color: palette.text,
-        usePointStyle: true
-      }
-    },
-    tooltip: {
-      backgroundColor: 'rgba(15, 23, 42, 0.92)',
-      titleColor: '#fff',
-      bodyColor: '#e2e8f0'
-    }
+    legend: { labels: { color: palette.text, boxWidth: 12, font: { family: 'Inter' } } },
+    tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.95)', padding: 12 }
   });
 
   const baseScales = (palette) => ({
-    x: {
-      ticks: { color: palette.text },
-      grid: { color: palette.grid }
-    },
-    y: {
-      ticks: { color: palette.text },
-      grid: { color: palette.grid }
-    }
+    x: { ticks: { color: palette.text, font: { family: 'Inter' } }, grid: { color: palette.grid } },
+    y: { ticks: { color: palette.text, font: { family: 'Inter' } }, grid: { color: palette.grid } }
   });
 
   const groupBy = (array, keyGetter) => array.reduce((map, item) => {
@@ -453,22 +422,15 @@ const DashboardApp = (() => {
       acc.set(key, (acc.get(key) || 0) + 1);
       return acc;
     }, new Map());
-
     const sorted = [...counter.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
-    return {
-      labels: sorted.map(([label]) => label),
-      values: sorted.map(([, value]) => value)
-    };
+    return { labels: sorted.map(([l]) => l), values: sorted.map(([, v]) => v) };
   };
 
   const initializeDataTable = () => {
     state.dataTable = $('#kendalaTable').DataTable({
       data: [],
       columns: [
-        {
-          data: 'tanggal',
-          render: (data, type, row) => (type === 'sort' || type === 'type' ? row.dateTimestamp : data)
-        },
+        { data: 'tanggal', render: (data, type, row) => type === 'sort' ? row.dateTimestamp : data },
         { data: 'tid' },
         { data: 'merchant' },
         { data: 'leader' },
@@ -481,29 +443,18 @@ const DashboardApp = (() => {
       ],
       dom: 'Bfrt<"row mt-3 align-items-center"<"col-md-6"i><"col-md-6"p>>',
       buttons: [
-        {
-          extend: 'excelHtml5',
-          text: '<i class="bi bi-file-earmark-excel me-2"></i>Export Excel',
-          title: 'Monitoring Kendala Merchant EDC'
-        },
-        {
-          extend: 'csvHtml5',
-          text: '<i class="bi bi-filetype-csv me-2"></i>Export CSV',
-          title: 'Monitoring Kendala Merchant EDC'
-        }
+        { extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel me-2"></i>Excel', className: 'btn btn-sm btn-outline-secondary' },
+        { extend: 'csvHtml5', text: '<i class="bi bi-filetype-csv me-2"></i>CSV', className: 'btn btn-sm btn-outline-secondary' }
       ],
       pageLength: 10,
-      lengthMenu: [10, 25, 50, 100],
       order: [[0, 'desc']],
       responsive: true,
       language: {
         emptyTable: 'Belum ada data untuk ditampilkan',
         info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
-        infoEmpty: 'Menampilkan 0 sampai 0 dari 0 data',
-        lengthMenu: 'Tampilkan _MENU_ data',
-        search: 'Search tabel:',
-        searchPlaceholder: 'Cari semua kolom...',
-        paginate: { previous: 'Sebelumnya', next: 'Berikutnya' }
+        infoEmpty: 'Menampilkan 0 data',
+        search: 'Cari langsung:',
+        paginate: { previous: '<i class="bi bi-chevron-left"></i>', next: '<i class="bi bi-chevron-right"></i>' }
       }
     });
   };
@@ -518,29 +469,26 @@ const DashboardApp = (() => {
   };
 
   const updateTable = () => {
-    state.dataTable.clear();
-    state.dataTable.rows.add(state.filteredData);
-    state.dataTable.draw();
+    if (!state.dataTable) return;
+    state.dataTable.clear().rows.add(state.filteredData).draw();
   };
 
   const updateLastUpdated = () => {
     if (!state.lastUpdated) return;
     const formatted = formatDateTimeId(state.lastUpdated);
-    elements.lastUpdateLabel.textContent = `Update: ${formatted}`;
+    elements.lastUpdateLabel.textContent = `Live: ${formatted.split(' ')[3]}`;
     elements.lastUpdateFull.textContent = formatted;
   };
 
   const updateRecordCount = () => {
-    elements.recordCountLabel.textContent = `${state.filteredData.length.toLocaleString('id-ID')} data ditampilkan`;
+    elements.recordCountLabel.textContent = `${state.filteredData.length.toLocaleString('id-ID')} berkas ditemukan`;
   };
 
   const showError = (message) => {
     if (!message) {
       elements.errorAlert.classList.add('d-none');
-      elements.errorAlert.textContent = '';
       return;
     }
-
     elements.errorAlert.textContent = message;
     elements.errorAlert.classList.remove('d-none');
   };
