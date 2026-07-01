@@ -4,9 +4,10 @@ const DashboardApp = (() => {
   const state = {
     rawData: [],
     filteredData: [],
+    charts: {},
     dataTable: null,
     lastUpdated: null,
-    refreshTimer: null, // Menyimpan ID interval aktif
+    refreshTimer: null,
     filters: { startDate: '', endDate: '', leader: '', status: '', process: '', merchant: '' }
   };
 
@@ -18,11 +19,9 @@ const DashboardApp = (() => {
     applySavedTheme();
     initializeDataTable();
     
-    // Sinkronkan filter awal dari form input DOM (mencegah reset manual)
     syncFiltersFromDOM();
-    
     loadData();
-    setupAutoRefresh(); // Inisialisasi interval waktu auto-refresh default
+    setupAutoRefresh();
   };
 
   const cacheElements = () => {
@@ -58,7 +57,6 @@ const DashboardApp = (() => {
   };
 
   const setupAutoRefresh = () => {
-    // Bersihkan interval yang ada sebelumnya
     if (state.refreshTimer) {
       window.clearInterval(state.refreshTimer);
       state.refreshTimer = null;
@@ -76,6 +74,21 @@ const DashboardApp = (() => {
     const next = current === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-bs-theme', next);
     localStorage.setItem('dashboard-theme', next);
+
+    const palette = getChartPalette();
+    Object.keys(state.charts).forEach(chartId => {
+      const chart = state.charts[chartId];
+      if(chart.options.scales) {
+        chart.options.scales.x.ticks.color = palette.text;
+        chart.options.scales.x.grid.color = palette.grid;
+        chart.options.scales.y.ticks.color = palette.text;
+        chart.options.scales.y.grid.color = palette.grid;
+      }
+      if(chart.options.plugins && chart.options.plugins.legend) {
+        chart.options.plugins.legend.labels.color = palette.text;
+      }
+      chart.update();
+    });
   };
 
   const applySavedTheme = () => {
@@ -96,13 +109,15 @@ const DashboardApp = (() => {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-          const parsed = results.data.map(mapRow).filter((item) => item && item.dateObj instanceof Date && !Number.isNaN(item.dateObj.getTime()));
+          const parsed = results.data
+            .map(mapRow)
+            .filter((item) => item && item.dateObj instanceof Date && !Number.isNaN(item.dateObj.getTime()));
+
           state.rawData = parsed.sort((a, b) => b.dateObj - a.dateObj);
           state.lastUpdated = new Date();
 
           populateLeaderFilter();
           
-          // Memastikan filter lama tetap diproses pada data yang baru di-refresh
           syncFiltersFromDOM();
           applyFilters();
           
@@ -159,11 +174,18 @@ const DashboardApp = (() => {
     
     let day, month, year;
     if (datePart.includes('/')) {
-      [day, month, year] = datePart.split('/').map(Number);
+      const dParts = datePart.split('/');
+      day = Number(dParts[0]); month = Number(dParts[1]); year = Number(dParts[2]);
+    } else if (datePart.includes('-')) {
+      const dParts = datePart.split('-');
+      year = Number(dParts[0]); month = Number(dParts[1]); day = Number(dParts[2]);
     } else {
-      [year, month, day] = datePart.split('-').map(Number);
+      return new Date(value);
     }
-    const [hour = 0, minute = 0] = timePart.split(':').map(Number);
+
+    const tParts = timePart.split(':');
+    const hour = Number(tParts[0] || 0);
+    const minute = Number(tParts[1] || 0);
     return new Date(year, month - 1, day, hour, minute);
   };
 
@@ -173,6 +195,7 @@ const DashboardApp = (() => {
   };
 
   const syncFiltersFromDOM = () => {
+    if (!elements.startDate) return;
     state.filters = {
       startDate: elements.startDate.value,
       endDate: elements.endDate.value,
@@ -212,6 +235,7 @@ const DashboardApp = (() => {
     });
 
     updateKpis();
+    renderLeaderChart();
     updateTable();
     updateRecordCount();
   };
@@ -225,7 +249,6 @@ const DashboardApp = (() => {
       option.value = leader; option.textContent = leader;
       elements.leaderFilter.appendChild(option);
     });
-    // Mengunci nilai leader yang terpilih sebelumnya agar tidak hilang dari dropdown
     elements.leaderFilter.value = leaders.includes(current) ? current : '';
   };
 
@@ -239,6 +262,94 @@ const DashboardApp = (() => {
     elements.kpiSM.textContent = data.filter(item => item.sm).length;
     elements.kpiCM.textContent = data.filter(item => item.cm).length;
     elements.kpiFU.textContent = data.filter(item => item.fu).length;
+  };
+
+  // PEMBARUAN: Mengubah Grafik Menjadi Stacked Bar Berdasarkan Pembagian Status
+  const renderLeaderChart = () => {
+    const palette = getChartPalette();
+    
+    // 1. Dapatkan top 10 leader berdasarkan total kendala
+    const leaderCounts = {};
+    state.filteredData.forEach(item => {
+      const leader = item.leader || 'Tidak ditemukan';
+      leaderCounts[leader] = (leaderCounts[leader] || 0) + 1;
+    });
+    
+    const topLeaders = Object.entries(leaderCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(entry => entry[0]);
+
+    // 2. Ekstrak jumlah status tiket masing-masing leader tersebut
+    const progressData = [];
+    const pendingData = [];
+    const doneData = [];
+
+    topLeaders.forEach(leader => {
+      const leaderItems = state.filteredData.filter(item => item.leader === leader);
+      
+      progressData.push(leaderItems.filter(item => item.status === 'On Progress').length);
+      pendingData.push(leaderItems.filter(item => item.status === 'Pending').length);
+      doneData.push(leaderItems.filter(item => item.status === 'Done').length);
+    });
+
+    // 3. Merender grafik bertumpuk (Stacked Chart) multi-dataset
+    updateOrCreateChart('leaderChart', 'bar', topLeaders, [
+      {
+        label: 'Done',
+        data: doneData,
+        backgroundColor: '#4ade80', // Hijau cerah
+        borderRadius: 4
+      },
+      {
+        label: 'On Progress',
+        data: progressData,
+        backgroundColor: '#60a5fa', // Biru cerah
+        borderRadius: 4
+      },
+      {
+        label: 'Pending',
+        data: pendingData,
+        backgroundColor: '#fbbf24', // Kuning cerah
+        borderRadius: 4
+      }
+    ], {
+      indexAxis: 'y',
+      scales: {
+        x: { stacked: true, ticks: { color: palette.text }, grid: { color: palette.grid } },
+        y: { stacked: true, ticks: { color: palette.text }, grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: true, labels: { color: palette.text, font: { family: 'Inter' } } },
+        tooltip: { backgroundColor: 'rgba(0, 0, 0, 0.85)' }
+      }
+    });
+  };
+
+  const updateOrCreateChart = (canvasId, type, labels, datasets, extraOptions = {}) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    if (state.charts[canvasId]) {
+      const chart = state.charts[canvasId];
+      chart.data.labels = labels;
+      chart.data.datasets = datasets;
+      chart.update('active');
+    } else {
+      state.charts[canvasId] = new Chart(canvas, {
+        type,
+        data: { labels, datasets },
+        options: { responsive: true, maintainAspectRatio: false, ...extraOptions }
+      });
+    }
+  };
+
+  const getChartPalette = () => {
+    const theme = document.documentElement.getAttribute('data-bs-theme');
+    return {
+      text: theme === 'dark' ? '#e2e8f0' : '#212529',
+      grid: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+    };
   };
 
   const initializeDataTable = () => {
@@ -269,10 +380,13 @@ const DashboardApp = (() => {
   };
 
   const updateTable = () => { 
-    // Menggunakan state preservation bawaan DataTables saat memuat baris baru
+    if (!state.dataTable) return;
+    state.dataTable.search('');
     const currentPage = state.dataTable.page();
     state.dataTable.clear().rows.add(state.filteredData).draw(false); 
-    state.dataTable.page(currentPage).draw('page');
+    if(currentPage < state.dataTable.page.info().pages) {
+        state.dataTable.page(currentPage).draw('page');
+    }
   };
   
   const updateLastUpdated = () => { if (state.lastUpdated) elements.lastUpdateFull.textContent = 'Last refreshed: ' + state.lastUpdated.toLocaleTimeString('id-ID') + ' WIB'; };

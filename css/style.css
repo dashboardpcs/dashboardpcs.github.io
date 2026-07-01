@@ -1,11 +1,10 @@
-/* --- Penyelarasan Semantik Palet Warna Flat Pro --- */
 :root {
   --nav-bg: #f8f9fa;
   --body-bg: #ffffff;
   --text-main: #212529;
   --border-color: #dee2e6;
   
-  /* Latar Belakang Kartu Pastel Solid Sesuai Request Baru */
+  /* Latar Belakang Kartu Pastel Solid */
   --bg-banner: #7c4dff;        /* Ungu Header */
   --card-total: #f1f3f5;       /* Abu-abu */
   --card-progress: #a5d8ff;    /* Biru (On Progress) */
@@ -85,7 +84,7 @@ body {
   margin-bottom: 1rem;
 }
 
-/* Sub-Banner List of Task */
+/* Sub-Banner List */
 .it-dashboard-sub-banner {
   background-color: #d1c4e9;
   color: #311b92;
@@ -125,11 +124,18 @@ html[data-bs-theme="dark"] .pose-kpi-card .kpi-title { color: #ced4da; }
 }
 html[data-bs-theme="dark"] .pose-kpi-card .kpi-value { color: #ffffff; }
 
-/* Pemetaan Pembaruan Warna Latar Belakang Kartu */
+/* Pemetaan Latar Belakang Kartu */
 .bg-pastel-gray { background-color: var(--card-total) !important; }
 .bg-pastel-blue { background-color: var(--card-progress) !important; }
 .bg-pastel-yellow { background-color: var(--card-pending) !important; }
 .bg-pastel-green { background-color: var(--card-done) !important; }
+
+/* Wrapper Canvas Grafik */
+.chart-wrapper {
+  position: relative;
+  height: 320px;
+  width: 100%;
+}
 
 /* Table Container & Row */
 .table-card-container {
